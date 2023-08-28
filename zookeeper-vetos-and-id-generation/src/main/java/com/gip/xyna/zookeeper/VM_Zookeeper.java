@@ -758,6 +758,15 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
      * @return
      */
     public Collection<VetoInformation> listVetos() {
+        // FIXME: Tests fail currently, because we don't block, when releasing vetos
+        if (!vetoProcessingQueue.isEmpty()) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
         return Collections.unmodifiableCollection(getAllExistingVetos());
     }
 

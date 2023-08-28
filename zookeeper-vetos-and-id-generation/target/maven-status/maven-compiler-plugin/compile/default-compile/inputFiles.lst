@@ -1,7 +1,0 @@
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/AdministrativeVeto.java
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/IDGenerationAlgorithmUsingZookeeper.java
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/VetoInformation.java
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/VM_Zookeeper.java
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/App.java
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/OrderInformation.java
-/workspaces/zookeeper/zookeeper-vetos-and-id-generation/src/main/java/com/gip/xyna/zookeeper/VetoAllocationResult.java

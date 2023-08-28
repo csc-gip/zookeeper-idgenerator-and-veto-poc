@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.gip.xyna.zookeeper.IDGeneratorTest
--------------------------------------------------------------------------------
-Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 201.31 s - in com.gip.xyna.zookeeper.IDGeneratorTest
