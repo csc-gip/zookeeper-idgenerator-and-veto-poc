@@ -128,7 +128,7 @@ public class IDGeneratorTest extends BaseClassForTests {
 
             var max = result.stream().map(f -> {
                 try {
-                    return f.get() % DEFAULT_INCREMENT;
+                    return f.get();
                 } catch (InterruptedException e) {
 
                     e.printStackTrace();
@@ -141,7 +141,7 @@ public class IDGeneratorTest extends BaseClassForTests {
 
             }).reduce(Math::max);
 
-            assertEquals(0, max.get());
+            assertEquals(DEFAULT_INCREMENT*threads*increments, max.get());
         } catch (InterruptedException e) {
             e.printStackTrace();
             fail();
