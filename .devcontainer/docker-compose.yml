@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/java:1-11
+    volumes:
+      - ../..:/workspaces:cached
+    network_mode: service:zookeeper
+    command: sleep infinity
+
+  zookeeper:
+    image: zookeeper:latest
+    restart: unless-stopped
+    volumes:
+      - zookeeper-data:/data
+      - zookeeper-log:/datalog
+    ports:
+      - 2181:2181
+    environment:
+      ZOO_STANDALONE_ENABLED: true
+
+volumes:
+  zookeeper-data:
+  zookeeper-log:

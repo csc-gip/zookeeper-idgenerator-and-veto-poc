@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.gip.xyna.zookeeper.IDGeneratorTest" time="201.31" tests="10" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="awt.toolkit" value="sun.awt.X11.XToolkit"/>
+    <property name="java.specification.version" value="11"/>
+    <property name="sun.cpu.isalist" value=""/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.class.path" value="/workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/test-classes:/workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/classes:/home/vscode/.m2/repository/org/apache/curator/curator-test/5.5.0/curator-test-5.5.0.jar:/home/vscode/.m2/repository/org/apache/zookeeper/zookeeper/3.7.1/zookeeper-3.7.1.jar:/home/vscode/.m2/repository/org/apache/zookeeper/zookeeper-jute/3.7.1/zookeeper-jute-3.7.1.jar:/home/vscode/.m2/repository/org/apache/yetus/audience-annotations/0.12.0/audience-annotations-0.12.0.jar:/home/vscode/.m2/repository/io/netty/netty-handler/4.1.76.Final/netty-handler-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-common/4.1.76.Final/netty-common-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-resolver/4.1.76.Final/netty-resolver-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-buffer/4.1.76.Final/netty-buffer-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport/4.1.76.Final/netty-transport-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-codec/4.1.76.Final/netty-codec-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport-native-epoll/4.1.76.Final/netty-transport-native-epoll-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.76.Final/netty-transport-native-unix-common-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport-classes-epoll/4.1.76.Final/netty-transport-classes-epoll-4.1.76.Final.jar:/home/vscode/.m2/repository/org/slf4j/slf4j-api/1.7.35/slf4j-api-1.7.35.jar:/home/vscode/.m2/repository/io/dropwizard/metrics/metrics-core/3.2.5/metrics-core-3.2.5.jar:/home/vscode/.m2/repository/org/xerial/snappy/snappy-java/1.1.7/snappy-java-1.1.7.jar:/home/vscode/.m2/repository/com/google/guava/guava/31.1-jre/guava-31.1-jre.jar:/home/vscode/.m2/repository/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar:/home/vscode/.m2/repository/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/home/vscode/.m2/repository/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar:/home/vscode/.m2/repository/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar:/home/vscode/.m2/repository/com/google/errorprone/error_prone_annotations/2.11.0/error_prone_annotations-2.11.0.jar:/home/vscode/.m2/repository/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar:/home/vscode/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.6.2/junit-jupiter-api-5.6.2.jar:/home/vscode/.m2/repository/org/apiguardian/apiguardian-api/1.1.0/apiguardian-api-1.1.0.jar:/home/vscode/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/home/vscode/.m2/repository/org/junit/platform/junit-platform-commons/1.6.2/junit-platform-commons-1.6.2.jar:/home/vscode/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.6.2/junit-jupiter-engine-5.6.2.jar:/home/vscode/.m2/repository/org/junit/platform/junit-platform-engine/1.6.2/junit-platform-engine-1.6.2.jar:/home/vscode/.m2/repository/org/apache/curator/curator-framework/5.5.0/curator-framework-5.5.0.jar:/home/vscode/.m2/repository/org/apache/curator/curator-client/5.5.0/curator-client-5.5.0.jar:/home/vscode/.m2/repository/org/apache/curator/curator-recipes/5.5.0/curator-recipes-5.5.0.jar:/home/vscode/.m2/repository/org/apache/logging/log4j/log4j-api/2.17.1/log4j-api-2.17.1.jar:/home/vscode/.m2/repository/org/apache/logging/log4j/log4j-core/2.17.1/log4j-core-2.17.1.jar:"/>
+    <property name="java.vm.vendor" value="Microsoft"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.vendor.url" value="https://www.microsoft.com"/>
+    <property name="user.timezone" value=""/>
+    <property name="java.vm.specification.version" value="11"/>
+    <property name="os.name" value="Linux"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="US"/>
+    <property name="sun.boot.library.path" value="/usr/local/sdkman/candidates/java/11.0.20-ms/lib"/>
+    <property name="sun.java.command" value="/workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/surefire/surefirebooter6761625162022741915.jar /workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/surefire 2023-08-24T16-35-35_233-jvmRun1 surefire9064863266886371868tmp surefire_011423821841687400119tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="/workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/test-classes:/workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/classes:/home/vscode/.m2/repository/org/apache/curator/curator-test/5.5.0/curator-test-5.5.0.jar:/home/vscode/.m2/repository/org/apache/zookeeper/zookeeper/3.7.1/zookeeper-3.7.1.jar:/home/vscode/.m2/repository/org/apache/zookeeper/zookeeper-jute/3.7.1/zookeeper-jute-3.7.1.jar:/home/vscode/.m2/repository/org/apache/yetus/audience-annotations/0.12.0/audience-annotations-0.12.0.jar:/home/vscode/.m2/repository/io/netty/netty-handler/4.1.76.Final/netty-handler-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-common/4.1.76.Final/netty-common-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-resolver/4.1.76.Final/netty-resolver-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-buffer/4.1.76.Final/netty-buffer-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport/4.1.76.Final/netty-transport-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-codec/4.1.76.Final/netty-codec-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport-native-epoll/4.1.76.Final/netty-transport-native-epoll-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.76.Final/netty-transport-native-unix-common-4.1.76.Final.jar:/home/vscode/.m2/repository/io/netty/netty-transport-classes-epoll/4.1.76.Final/netty-transport-classes-epoll-4.1.76.Final.jar:/home/vscode/.m2/repository/org/slf4j/slf4j-api/1.7.35/slf4j-api-1.7.35.jar:/home/vscode/.m2/repository/io/dropwizard/metrics/metrics-core/3.2.5/metrics-core-3.2.5.jar:/home/vscode/.m2/repository/org/xerial/snappy/snappy-java/1.1.7/snappy-java-1.1.7.jar:/home/vscode/.m2/repository/com/google/guava/guava/31.1-jre/guava-31.1-jre.jar:/home/vscode/.m2/repository/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar:/home/vscode/.m2/repository/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/home/vscode/.m2/repository/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar:/home/vscode/.m2/repository/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar:/home/vscode/.m2/repository/com/google/errorprone/error_prone_annotations/2.11.0/error_prone_annotations-2.11.0.jar:/home/vscode/.m2/repository/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar:/home/vscode/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.6.2/junit-jupiter-api-5.6.2.jar:/home/vscode/.m2/repository/org/apiguardian/apiguardian-api/1.1.0/apiguardian-api-1.1.0.jar:/home/vscode/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/home/vscode/.m2/repository/org/junit/platform/junit-platform-commons/1.6.2/junit-platform-commons-1.6.2.jar:/home/vscode/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.6.2/junit-jupiter-engine-5.6.2.jar:/home/vscode/.m2/repository/org/junit/platform/junit-platform-engine/1.6.2/junit-platform-engine-1.6.2.jar:/home/vscode/.m2/repository/org/apache/curator/curator-framework/5.5.0/curator-framework-5.5.0.jar:/home/vscode/.m2/repository/org/apache/curator/curator-client/5.5.0/curator-client-5.5.0.jar:/home/vscode/.m2/repository/org/apache/curator/curator-recipes/5.5.0/curator-recipes-5.5.0.jar:/home/vscode/.m2/repository/org/apache/logging/log4j/log4j-api/2.17.1/log4j-api-2.17.1.jar:/home/vscode/.m2/repository/org/apache/logging/log4j/log4j-core/2.17.1/log4j-core-2.17.1.jar:"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="/home/vscode"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2023-07-18"/>
+    <property name="java.home" value="/usr/local/sdkman/candidates/java/11.0.20-ms"/>
+    <property name="file.separator" value="/"/>
+    <property name="basedir" value="/workspaces/zookeeper/zookeeper-vetos-and-id-generation"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.awt.graphicsenv" value="sun.awt.X11GraphicsEnvironment"/>
+    <property name="surefire.real.class.path" value="/workspaces/zookeeper/zookeeper-vetos-and-id-generation/target/surefire/surefirebooter6761625162022741915.jar"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="11.0.20+8-LTS"/>
+    <property name="user.name" value="vscode"/>
+    <property name="path.separator" value=":"/>
+    <property name="os.version" value="5.10.16.3-microsoft-standard-WSL2"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Microsoft-8035250"/>
+    <property name="localRepository" value="/home/vscode/.m2/repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/microsoft/openjdk/issues"/>
+    <property name="java.io.tmpdir" value="/tmp"/>
+    <property name="java.version" value="11.0.20"/>
+    <property name="user.dir" value="/workspaces/zookeeper/zookeeper-vetos-and-id-generation"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="java.awt.printerjob" value="sun.print.PSPrinterJob"/>
+    <property name="sun.os.patch.level" value="unknown"/>
+    <property name="java.library.path" value="/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib"/>
+    <property name="java.vm.info" value="mixed mode"/>
+    <property name="java.vendor" value="Microsoft"/>
+    <property name="java.vm.version" value="11.0.20+8-LTS"/>
+    <property name="java.specification.maintenance.version" value="2"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="55.0"/>
+  </properties>
+  <testcase name="testParallelAccessWithDegradedCluster" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="35.073"/>
+  <testcase name="testInit" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="0.076"/>
+  <testcase name="testServerRestart" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="0.08"/>
+  <testcase name="testParallelAccessWithRestartingCluster" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="97.609"/>
+  <testcase name="testParallelAccessWithFailedCluster" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="60.186"/>
+  <testcase name="testParallelAccess" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="1.762"/>
+  <testcase name="testParallelAccessWithCluster" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="1.496"/>
+  <testcase name="testServerStopped" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="0.071"/>
+  <testcase name="testParallelCounting" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="4.557"/>
+  <testcase name="testReInit" classname="com.gip.xyna.zookeeper.IDGeneratorTest" time="0.343"/>
+</testsuite>
