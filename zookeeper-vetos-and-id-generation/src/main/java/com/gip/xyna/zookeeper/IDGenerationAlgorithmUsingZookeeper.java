@@ -106,7 +106,14 @@ public class IDGenerationAlgorithmUsingZookeeper /* implements IdGenerationAlgor
         }
 
         try {
-            return realmCounter.next().postValue();
+            synchronized(realmCounter) {
+                var next = realmCounter.next();
+                while (!next.succeeded()) {
+                    next = realmCounter.next();
+                }
+
+                return next.postValue();
+            }
         } catch (Exception e) { // should not happen as we retry forever
             log.error("Could not get Zookeeper counter for ID generation in realm " + realm);
             throw new RuntimeException("Could not get Zookeeper counter for ID generation in realm " + realm, e);
