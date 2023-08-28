@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import org.apache.curator.test.BaseClassForTests;
 import org.junit.jupiter.api.Test;
@@ -362,7 +366,7 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         av = new AdministrativeVeto("Test Admin Veto", "Test Doku 2");
         vm.setDocumentationOfAdministrativeVeto(av);
-        
+
         assertTrue(vm.listVetos().size() == 1);
 
     }
@@ -379,8 +383,37 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.listVetos().size() == 1);
 
         vm.freeAdministrativeVeto(av);
-        
+
         assertTrue(vm.listVetos().isEmpty());
 
+    }
+
+    @Test
+    public void timeAllocateVeto() {
+
+        int numVetos = 1_000;
+
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        vm.init(server.getConnectString());
+
+        List<OrderInformation> oi = LongStream.range(0, numVetos)
+        .mapToObj(i -> new OrderInformation(i, i, UUID.randomUUID().toString())).collect(Collectors.toList());
+        List<List<String>> vetos = LongStream.range(0, numVetos)
+        .mapToObj(i -> Arrays.asList(UUID.randomUUID().toString())).collect(Collectors.toList());
+
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < numVetos; ++i) {
+            vm.allocateVetos(oi.get(i), vetos.get(i), 0);
+        }
+        long stop = System.currentTimeMillis();
+
+        assertEquals(numVetos, vm.listVetos().size());
+
+        long allocationTime = (stop-start)/numVetos;
+
+        System.out.println("Time per allocation [ms]: " + allocationTime);
+
+        assertTrue(allocationTime < 50L, () -> "Allocationtime " + allocationTime + " < 50ms");
     }
 }

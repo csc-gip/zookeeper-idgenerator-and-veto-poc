@@ -39,7 +39,6 @@ public class App {
         r = vm.allocateVetos(oi2, Arrays.asList("Veto 2", "Veto 3"), 0);
         System.out.println(r);
 
-
         vm.listVetos().stream().forEach(v -> System.out.println(v));
 
         vm.undoAllocation(oi1, Arrays.asList("Veto 1"));
@@ -47,8 +46,9 @@ public class App {
         vm.undoAllocation(oi2, Arrays.asList("Veto 2"));
         vm.undoAllocation(oi2, Arrays.asList("Veto 3"));
 
-      /*  vm.freeVetosForced(1);
+        vm.freeVetosForced(1);
         vm.freeVetosForced(2);
-*/
+
+        vm.shutdown();
     }
 }
