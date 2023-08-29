@@ -7,11 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 import org.apache.curator.test.BaseClassForTests;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 public class VM_ZookeeperTest extends BaseClassForTests {
 
@@ -304,6 +306,34 @@ public class VM_ZookeeperTest extends BaseClassForTests {
     }
 
     @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    public void rereallocateVeto() {
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        vm.init(server.getConnectString());
+
+        OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
+
+        VetoAllocationResult r;
+        for (int i = 1; i < 11; ++i) {
+            r = vm.allocateVetos(oi1, Arrays.asList("Veto " + String.valueOf(i)), 0);
+            assertTrue(r.isAllocated());
+        }
+
+        for (int i = 10; i > 0; --i) {
+            vm.undoAllocation(oi1, Arrays.asList("Veto " + String.valueOf(i)));
+        }
+
+        r = vm.allocateVetos(oi1, Arrays.asList("Veto 1", "Veto 2"), 0);
+        while (r.getExistingVeto() != null || VetoAllocationResult.FAILED.equals(r)) {
+            r = vm.allocateVetos(oi1, Arrays.asList("Veto 1", "Veto 2"), 0);
+        }
+        assertTrue(r.isAllocated());
+
+        while (vm.listVetos().size() != 2);
+    }
+
+    @Test
     public void addAllocationOfVeto() {
         VM_Zookeeper vm = new VM_Zookeeper();
 
@@ -398,9 +428,9 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.init(server.getConnectString());
 
         List<OrderInformation> oi = LongStream.range(0, numVetos)
-        .mapToObj(i -> new OrderInformation(i, i, UUID.randomUUID().toString())).collect(Collectors.toList());
+                .mapToObj(i -> new OrderInformation(i, i, UUID.randomUUID().toString())).collect(Collectors.toList());
         List<List<String>> vetos = LongStream.range(0, numVetos)
-        .mapToObj(i -> Arrays.asList(UUID.randomUUID().toString())).collect(Collectors.toList());
+                .mapToObj(i -> Arrays.asList(UUID.randomUUID().toString())).collect(Collectors.toList());
 
         long start = System.currentTimeMillis();
         for (int i = 0; i < numVetos; ++i) {
@@ -410,7 +440,7 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         assertEquals(numVetos, vm.listVetos().size());
 
-        long allocationTime = (stop-start)/numVetos;
+        long allocationTime = (stop - start) / numVetos;
 
         System.out.println("Time per allocation [ms]: " + allocationTime);
 

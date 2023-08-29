@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +29,8 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.api.transaction.CuratorOp;
 import org.apache.curator.framework.api.transaction.CuratorTransactionResult;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
+import org.apache.curator.framework.recipes.cache.CuratorCache;
+import org.apache.curator.framework.recipes.cache.CuratorCacheListener;
 import org.apache.curator.framework.recipes.locks.InterProcessLock;
 import org.apache.curator.framework.recipes.locks.InterProcessMultiLock;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;
@@ -40,7 +43,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 
 public class VM_Zookeeper /* implements VetoManagementInterface */ {
@@ -96,8 +101,9 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
                     + vetoProcessingQueue.stream().map(v -> v.toString() + ", ").reduce("", String::concat));
         }
 
-        if (zk_client != null)
+        if (zk_client != null) {
             zk_client.close();
+        }
 
     }
 
@@ -158,6 +164,7 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         if (log.isInfoEnabled()) {
             log.info("Connected to Zookeeper");
         }
+
     };
 
     private boolean reconnect() {
@@ -275,21 +282,42 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
      */
     public VetoAllocationResult allocateVetos(OrderInformation orderInformation, List<String> vetos, long urgency) {
 
+        long start = 0;
+
         if (vetos == null || vetos.size() <= 0)
             return VetoAllocationResult.SUCCESS;
 
-        // check in cache if another order holds one of the vetos
-        Optional<String> existingVeto = vetos.stream()
+        // don't block the scheduler if we have no connection to update the vetos
+        if (!reconnect())
+            return VetoAllocationResult.FAILED;
+
+        if (log.isTraceEnabled()) {
+            log.trace("Time before veto check: " + (start = System.currentTimeMillis()));
+        }
+        // check if another order holds one of the vetos
+        Optional<VetoInformation> existingVeto = vetos.stream()
                 .map(v -> sanitizeVeto(v))
-                .filter(v -> vetoCache.containsKey(v))
-                .filter(v -> vetoCache.get(v).isAdministrative()
-                        || !vetoCache.get(v).getUsingOrderId().equals(orderInformation.getOrderId()))
+                .map(v -> {
+                    try {
+                        return vetoCache.containsKey(v) ? vetoCache.get(v)
+                                : deserializeVetoInformation(zkc.getData().forPath(VETO_BY_NAME + "/" + v));
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(vi -> vi != null)
+                .filter(vi -> vi.isAdministrative()
+                        || !vi.getUsingOrderId().equals(orderInformation.getOrderId()))
                 .findFirst();
 
         if (existingVeto.isPresent()) {
             if (log.isDebugEnabled())
-                log.debug("found other order holding veto in cache: " + vetoCache.get(existingVeto.get()));
-            return new VetoAllocationResult(vetoCache.get(existingVeto.get()));
+                log.debug("found other order holding veto in cache: " + existingVeto.get());
+            return new VetoAllocationResult(existingVeto.get());
+        }
+        if (log.isTraceEnabled()) {
+            log.trace("Time for veto check: " + start + " + " + String.valueOf(System.currentTimeMillis() - start)
+                    + "ms");
         }
 
         // don't block the scheduler if we have no connection to update the vetos
@@ -300,24 +328,24 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
 
         boolean lockAquired = false;
         try {
+            if (log.isTraceEnabled()) {
+                log.trace("Time before aquiring lock: " + (start = System.currentTimeMillis()));
+            }
             if (!(lockAquired = lock.acquire(0, TimeUnit.SECONDS))) { // tryLock
                 return VetoAllocationResult.FAILED;
             }
-
-            // check in zookeeper if another order holds one of the vetos
-            List<VetoInformation> existing = getExistingVetos(vetos);
-
-            Optional<VetoInformation> existingRemoteVeto = existing.stream()
-                    .filter(v -> v.isAdministrative()
-                            || !v.getUsingOrderId().equals(orderInformation.getOrderId()))
-                    .findFirst();
-
-            if (existingRemoteVeto.isPresent()) {
-                return new VetoAllocationResult(existingRemoteVeto.get());
+            if (log.isTraceEnabled()) {
+                log.trace("Time for aquiring lock: " + start + " + "
+                        + String.valueOf(System.currentTimeMillis() - start) + "ms");
             }
 
+            // check if this order holds one of the vetos
+            List<VetoInformation> existing = getExistingVetos(vetos).stream()
+                    .filter(vi -> !vi.isAdministrative() && vi.getUsingOrderId().equals(orderInformation.getOrderId()))
+                    .collect(Collectors.toList());
+
             ArrayList<CuratorOp> operations;
-            if (existing == null || existing.size() == 0) {
+            if (existing == null || existing.isEmpty()) {
                 if (log.isDebugEnabled()) {
                     log.debug("Allocating new vetos: " + vetos.stream().map(s -> s + " ").reduce("", String::concat));
                 }
@@ -337,14 +365,52 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
             if (operations.isEmpty())
                 return VetoAllocationResult.SUCCESS;
 
+            if (log.isTraceEnabled()) {
+                log.trace(operations.stream()
+                        .map(o -> o.getTypeAndPath().getType() + "@" + o.getTypeAndPath().getForPath())
+                        .collect(Collectors.toList()));
+            }
+
             // we might have lost the lock
             if (!reconnect() || !lock.isAcquiredInThisProcess())
                 return VetoAllocationResult.FAILED;
 
-            List<CuratorTransactionResult> results = zkc.transaction().forOperations(operations);
+            try {
+                if (log.isTraceEnabled()) {
+                    log.trace("Time before creating vetos: " + (start = System.currentTimeMillis()));
+                }
 
-            if (checkTransactionResults(results)) {
-                return VetoAllocationResult.SUCCESS;
+                List<CuratorTransactionResult> results = zkc.transaction().forOperations(operations);
+                if (log.isTraceEnabled()) {
+                    log.trace("Time for creating vetos: " + start + " + "
+                            + String.valueOf(System.currentTimeMillis() - start) + "ms");
+                }
+
+                if (checkTransactionResults(results)) {
+                    vetos.forEach(
+                            v -> vetoCache.putIfAbsent(v, new VetoInformation(sanitizeVeto(v), orderInformation, 0)));
+                    return VetoAllocationResult.SUCCESS;
+                }
+            } catch (NodeExistsException e) { // another node has been faster
+                Optional<VetoInformation> existingCollisionVeto = vetos.stream()
+                        .map(v -> {
+                            try {
+                                return deserializeVetoInformation(
+                                        zkc.getData().forPath(VETO_BY_NAME + "/" + sanitizeVeto(v)));
+                            } catch (Exception e1) {
+                                return null;
+                            }
+                        })
+                        .filter(vi -> vi != null && (vi.isAdministrative()
+                                || !vi.getUsingOrderId().equals(orderInformation.getOrderId())))
+                        .findFirst();
+
+                if (existingCollisionVeto.isPresent()) {
+                    if (log.isDebugEnabled())
+                        log.debug("found other order holding veto in zookeeper: " + existingCollisionVeto.get());
+                    return new VetoAllocationResult(existingCollisionVeto.get());
+                }
+                return VetoAllocationResult.FAILED;
             }
 
         } catch (Exception e) {
@@ -369,8 +435,42 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         Set<String> existingSet = existing.stream().map(vi -> vi.getName()).collect(Collectors.toSet());
         List<String> newVetos = vetos.stream().filter(v -> !existingSet.contains(v)).collect(Collectors.toList());
 
-        if (newVetos == null || newVetos.size() == 0)
+        List<AbstractMap.SimpleEntry<OrderInformation, List<String>>> alteredEntries = Lists.newArrayList();
+        var it = vetoProcessingQueue.iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            if (entry.getKey().getOrderId().equals(orderInformation.getOrderId())) {
+                if (entry.getValue().stream().anyMatch(v -> existingSet.contains(v))) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("altering entry in vetoProcessingQueue " + entry);
+                    }
+                    alteredEntries.add(entry);
+                    vetoProcessingQueue.remove(entry);
+                }
+            }
+        }
+        for (var entry : alteredEntries) {
+            List<String> remaining = entry.getValue().stream().filter(v -> !existingSet.contains(v))
+                    .collect(Collectors.toList());
+            if (!remaining.isEmpty()) {
+                entry.setValue(remaining);
+                vetoProcessingQueue.add(entry);
+                if (log.isDebugEnabled()) {
+                    log.debug("replaced entry in vetoProcessingQueue " + entry);
+                }
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("removed entry from vetoProcessingQueue " + entry);
+                }
+            }
+        }
+
+        if (newVetos == null || newVetos.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("no new vetos to allocate.", existing);
+            }
             return Lists.newArrayList();
+        }
 
         return allocateVetoNodesForOrder(newVetos, orderInformation);
     }
@@ -422,16 +522,20 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
                 String sanitizedVeto = sanitizeVeto(veto);
 
                 String vetoNodeNamePath = VETO_BY_NAME + "/" + sanitizedVeto;
-
-                if (zkc.checkExists().forPath(vetoNodeNamePath) != null) {
-                    if (!reconnect())
+                Stat stats = new Stat();
+                try {
+                    if (!reconnect()) {
                         return result;
-                    try {
-                        zkc.delete().forPath(vetoNodeNamePath);
-                    } catch (NoNodeException e) {
                     }
-                    result.put(veto, Boolean.TRUE);
-                } else {
+                    VetoInformation vi = deserializeVetoInformation(
+                            zkc.getData().storingStatIn(stats).forPath(vetoNodeNamePath));
+
+                    if (vi.isAdministrative() || vi.getUsingOrderId().equals(orderId)) {
+                        zkc.delete().withVersion(stats.getVersion()).forPath(vetoNodeNamePath);
+                        result.put(veto, Boolean.TRUE);
+                    }
+
+                } catch (NoNodeException e) {
                     result.put(veto, Boolean.TRUE);
                 }
 
@@ -483,6 +587,7 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         try {
             stat = zkc.checkExists().forPath(vetoNodePath);
         } catch (Exception e) {
+            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
@@ -512,31 +617,18 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
     }
 
     private List<VetoInformation> getExistingVetos(List<String> vetos) {
-        List<VetoInformation> result = new ArrayList<>();
 
-        for (String veto : vetos) {
-            String vetoNodePath = VETO_BY_NAME + "/" + sanitizeVeto(veto);
-            Stat stat = null;
-            try {
-                stat = zkc.checkExists().forPath(vetoNodePath);
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
+        return vetos.stream()
+                .map(v -> {
+                    try {
+                        return deserializeVetoInformation(zkc.getData().forPath(VETO_BY_NAME + "/" + sanitizeVeto(v)));
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(vi -> vi != null)
+                .collect(Collectors.toList());
 
-            if (stat != null) {
-                try {
-                    byte[] data = zkc.getData().forPath(vetoNodePath);
-                    VetoInformation vi = deserializeVetoInformation(data);
-                    result.add(vi);
-                } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        return result;
     }
 
     private List<String> getExistingVetosForOrderId(Long orderId) {
@@ -635,7 +727,7 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
      * @param vetos
      */
     public void finalizeAllocation(OrderInformation orderInformation, List<String> vetos) {
-        vetos.forEach(v -> vetoCache.putIfAbsent(v, new VetoInformation(sanitizeVeto(v), orderInformation, 0)));
+
     }
 
     /**
@@ -697,7 +789,7 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
             for (var veto : vetosToClear) {
                 currVeto.add(veto);
                 try {
-                    Map<String, Boolean>  deleted = deallocateVetoNodesForOrder(currVeto, orderId);
+                    Map<String, Boolean> deleted = deallocateVetoNodesForOrder(currVeto, orderId);
                     deleted.entrySet().stream().filter(v -> v.getValue()).forEach(v -> vetoCache.remove(v.getKey()));
 
                 } catch (Exception e) {

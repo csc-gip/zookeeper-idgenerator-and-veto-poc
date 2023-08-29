@@ -447,7 +447,7 @@ public class VM_ZookeeperThreadTest extends BaseClassForTests {
             try {
                 return !b.get();
             } catch (Exception e) {
-                return Boolean.FALSE;
+                return Boolean.TRUE;
             }
         }));
 
@@ -514,7 +514,7 @@ public class VM_ZookeeperThreadTest extends BaseClassForTests {
             try {
                 return !b.get();
             } catch (Exception e) {
-                return Boolean.FALSE;
+                return Boolean.TRUE;
             }
         }));
 
@@ -594,7 +594,7 @@ public class VM_ZookeeperThreadTest extends BaseClassForTests {
             try {
                 return !b.get();
             } catch (Exception e) {
-                return Boolean.FALSE;
+                return Boolean.TRUE;
             }
         }));
 
