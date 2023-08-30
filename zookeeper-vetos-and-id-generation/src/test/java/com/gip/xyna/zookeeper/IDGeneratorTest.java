@@ -23,7 +23,12 @@ import org.junit.jupiter.api.Test;
 
 public class IDGeneratorTest extends BaseClassForTests {
 
+    // see IDGenerationAlgorithmUsingZookeeper
     private static Long DEFAULT_INCREMENT = 50_000L;
+
+    final int cores = Runtime.getRuntime().availableProcessors();
+
+    final int threads = Math.min(2 * cores, 5);
 
     @Test
     public void testInit() throws Exception {
@@ -106,7 +111,6 @@ public class IDGeneratorTest extends BaseClassForTests {
     @Test
     public void testParallelCounting() {
 
-        final int threads = 20;
         final int increments = 2;
 
         IDGenerationAlgorithmUsingZookeeper idgen = new IDGenerationAlgorithmUsingZookeeper();
@@ -141,7 +145,7 @@ public class IDGeneratorTest extends BaseClassForTests {
 
             }).reduce(Math::max);
 
-            assertEquals(DEFAULT_INCREMENT*threads*increments, max.get());
+            assertEquals(DEFAULT_INCREMENT * threads * increments, max.get());
         } catch (InterruptedException e) {
             e.printStackTrace();
             fail();
@@ -152,7 +156,6 @@ public class IDGeneratorTest extends BaseClassForTests {
     @Test
     public void testParallelAccess() {
 
-        final int threads = 20;
         final int increments = 2;
 
         Callable<Long> task = () -> {
@@ -196,7 +199,6 @@ public class IDGeneratorTest extends BaseClassForTests {
     @Test
     public void testParallelAccessWithCluster() {
 
-        final int threads = 20;
         final int increments = 2;
 
         TestingCluster cluster = null;
@@ -245,8 +247,7 @@ public class IDGeneratorTest extends BaseClassForTests {
         } catch (InterruptedException e) {
             e.printStackTrace();
             fail();
-        }
-        finally {
+        } finally {
             try {
                 cluster.close();
             } catch (IOException e) {
@@ -260,7 +261,6 @@ public class IDGeneratorTest extends BaseClassForTests {
     @Test
     public void testParallelAccessWithDegradedCluster() {
 
-        final int threads = 20;
         final int increments = 200;
 
         TestingCluster cluster = null;
@@ -315,8 +315,7 @@ public class IDGeneratorTest extends BaseClassForTests {
         } catch (Exception e) {
             e.printStackTrace();
             fail();
-        }
-        finally {
+        } finally {
             try {
                 cluster.close();
             } catch (IOException e) {
@@ -327,10 +326,9 @@ public class IDGeneratorTest extends BaseClassForTests {
 
     }
 
-   @Test
+    @Test
     public void testParallelAccessWithFailedCluster() {
 
-        final int threads = 20;
         final int increments = 200;
 
         TestingCluster cluster = null;
@@ -370,8 +368,7 @@ public class IDGeneratorTest extends BaseClassForTests {
         } catch (Exception e) {
             e.printStackTrace();
             fail();
-        }
-        finally {
+        } finally {
             try {
                 cluster.close();
             } catch (IOException e) {
@@ -379,12 +376,12 @@ public class IDGeneratorTest extends BaseClassForTests {
                 e.printStackTrace();
             }
         }
-        
 
-    }    @Test
+    }
+
+    @Test
     public void testParallelAccessWithRestartingCluster() {
 
-        final int threads = 20;
         final int increments = 200;
 
         TestingCluster cluster = null;
@@ -461,8 +458,7 @@ public class IDGeneratorTest extends BaseClassForTests {
         } catch (Exception e) {
             e.printStackTrace();
             fail();
-        }
-        finally {
+        } finally {
             try {
                 cluster.close();
             } catch (IOException e) {

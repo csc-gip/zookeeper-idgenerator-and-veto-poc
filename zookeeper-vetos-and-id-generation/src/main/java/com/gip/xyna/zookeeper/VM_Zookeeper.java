@@ -5,13 +5,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +24,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.curator.framework.CuratorFramework;
@@ -29,8 +33,6 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.api.transaction.CuratorOp;
 import org.apache.curator.framework.api.transaction.CuratorTransactionResult;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
-import org.apache.curator.framework.recipes.cache.CuratorCache;
-import org.apache.curator.framework.recipes.cache.CuratorCacheListener;
 import org.apache.curator.framework.recipes.locks.InterProcessLock;
 import org.apache.curator.framework.recipes.locks.InterProcessMultiLock;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;
@@ -38,12 +40,12 @@ import org.apache.curator.framework.state.ConnectionState;
 import org.apache.curator.framework.state.ConnectionStateListener;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.curator.shaded.com.google.common.collect.Lists;
+import org.apache.curator.utils.PathUtils;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
@@ -58,6 +60,8 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
     private static final String VETO_BY_ORDERID = VETO_PATH + "/by-orderid";
 
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
+
+    private static int PERMANENT_OBJECTS_CACHE_SIZE = 10_000;
 
     Logger log = LogManager.getLogger(this.getClass());
 
@@ -92,6 +96,10 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
 
     void shutdown() {
         vetoProcessor.shutdown();
+
+        if (log.isInfoEnabled()) {
+            log.info(showInformation());
+        }
 
         try {
             vetoProcessor.awaitTermination(10, TimeUnit.SECONDS);
@@ -186,17 +194,55 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         return isConnected.get();
     }
 
-    /* TODO uniqe idempotent transformation */
+    // https://zookeeper.apache.org/doc/r3.1.2/zookeeperProgrammers.html#ch_zkDataModel
+    // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/common/PathUtils.java#L43
+    // and replace every /
+    final static Pattern notAllowedInZNode = Pattern
+            .compile(".*[\u0000-\u001f\u007f-\u009F\ud800-\uf8ff\ufff0-\uffff/].*");
+    ConcurrentHashMap<String, String> sanitizedvetoNames = new ConcurrentHashMap<String, String>();
+
     private String sanitizeVeto(String veto) {
-        // https://zookeeper.apache.org/doc/r3.1.2/zookeeperProgrammers.html#ch_zkDataModel
-        // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/common/PathUtils.java#L43
-        // and replace every /
-        String sanitizedVeto = veto.replaceAll("[\u0000-\u001f\u007f-\u009F\ud800-\uf8ff\ufff0-\uffff/]", "_");
 
-        if (log.isWarnEnabled() && !sanitizedVeto.equals(veto))
-            log.warn("using sanitized Veto '" + sanitizedVeto + "' for Veto '" + veto + "'");
+        boolean invalid = false;
+        final Matcher m = notAllowedInZNode.matcher(veto);
+        if (!(invalid = m.matches())) {
+            try {
+                PathUtils.validatePath(veto);
+            } catch (IllegalArgumentException e) {
+                invalid = true;
+            }
+        }
 
-        return sanitizedVeto;
+        if (invalid) {
+            if (sanitizedvetoNames.containsKey(veto))
+                return sanitizedvetoNames.get(veto);
+
+            String sanitizedVeto = veto.replaceAll("[^-_\\s\\w\\.#+*,!?§$%&()\\[\\]{}]", "?");
+
+            try {
+                final MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+
+                byte[] hash = sha256.digest(veto.getBytes(Charset.forName("UTF-8")));
+                sha256.reset();
+
+                StringBuilder result = new StringBuilder(sanitizedVeto).append("_")
+                        .append(Base64.getUrlEncoder().encodeToString(hash));
+
+                if (log.isWarnEnabled() && !sanitizedVeto.equals(veto))
+                    log.warn("using sanitized Veto '" + result.toString() + "' for Veto '" + veto + "'");
+
+                if (sanitizedvetoNames.size() >= PERMANENT_OBJECTS_CACHE_SIZE) {
+                    sanitizedvetoNames.remove(sanitizedvetoNames.keys().nextElement());
+                }
+
+                sanitizedvetoNames.putIfAbsent(veto, result.toString());
+                return sanitizedvetoNames.get(veto);
+            } catch (Exception e) { // sha-256 is always available
+                e.printStackTrace();
+            }
+        }
+
+        return veto;
     }
 
     final ConcurrentHashMap<String, InterProcessMutex> vetoLocks = new ConcurrentHashMap<>();
@@ -210,12 +256,13 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         if (vl == null) {
             vl = new InterProcessMutex(zkc,
                     LOCK_PATH + "/" + sanitizedVeto);
-            InterProcessMutex ipm = vetoLocks.putIfAbsent(sanitizedVeto, vl);
-            if (ipm != null)
-                vl = ipm;
+            if (vetoLocks.size() >= PERMANENT_OBJECTS_CACHE_SIZE) {
+                vetoLocks.remove(vetoLocks.keys().nextElement());
+            }
+            vetoLocks.putIfAbsent(sanitizedVeto, vl);
         }
 
-        return vl;
+        return vetoLocks.get(sanitizedVeto);
     }
 
     private InterProcessLock getLock(List<String> vetos) {
@@ -230,13 +277,14 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
                 for (String v : vetos) {
                     mutexes.add(getOrCreateMutex(v));
                 }
+                if (vetoListLocks.size() >= PERMANENT_OBJECTS_CACHE_SIZE) {
+                    vetoListLocks.remove(vetoListLocks.keys().nextElement());
+                }
                 m = new InterProcessMultiLock(mutexes);
-                InterProcessMultiLock ipml = vetoListLocks.putIfAbsent(vetoID, m);
-                if (ipml != null)
-                    m = ipml;
+                vetoListLocks.putIfAbsent(vetoID, m);
             }
 
-            return m;
+            return vetoListLocks.get(vetoID);
         }
 
         if (vetos.size() == 1) {
@@ -520,6 +568,9 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         try {
             for (String veto : vetos) {
                 String sanitizedVeto = sanitizeVeto(veto);
+                if (log.isDebugEnabled()) {
+                    log.debug("deleting veto in zookeeper" + veto);
+                }
 
                 String vetoNodeNamePath = VETO_BY_NAME + "/" + sanitizedVeto;
                 Stat stats = new Stat();
@@ -533,9 +584,16 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
                     if (vi.isAdministrative() || vi.getUsingOrderId().equals(orderId)) {
                         zkc.delete().withVersion(stats.getVersion()).forPath(vetoNodeNamePath);
                         result.put(veto, Boolean.TRUE);
+                        if (log.isDebugEnabled()) {
+                            log.debug("deleted veto by name in zookeeper" + vetoNodeNamePath);
+                        }
+
                     }
 
                 } catch (NoNodeException e) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("veto by name not found in zookeeper" + vetoNodeNamePath);
+                    }
                     result.put(veto, Boolean.TRUE);
                 }
 
@@ -545,7 +603,13 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
                         return result;
                     try {
                         zkc.delete().forPath(vetoNodeIdNamePath);
+                        if (log.isDebugEnabled()) {
+                            log.debug("deleted veto for orderId in zookeeper" + vetoNodeIdNamePath);
+                        }
                     } catch (NoNodeException e) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("veto by orderId not found in zookeeper" + vetoNodeIdNamePath);
+                        }
                     }
                 }
             }
@@ -556,7 +620,14 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
                         return result;
                 try {
                     zkc.delete().forPath(vetoNodeIdPath);
+                    if (log.isDebugEnabled()) {
+                        log.debug("deleted znode for orderId in zookeeper" + vetoNodeIdPath);
+                    }
+
                 } catch (NoNodeException e) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("znode for orderId not found in zookeeper" + vetoNodeIdPath);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -582,6 +653,14 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
     private List<VetoInformation> getAllExistingVetos() {
         List<VetoInformation> result = new ArrayList<>();
 
+        if (!reconnect()) {
+            if (log.isWarnEnabled()) {
+                log.warn("no connection to zookeeper, listing vetos from cache");
+            }
+
+            return vetoCache.values().stream().collect(Collectors.toList());
+        }
+
         String vetoNodePath = VETO_BY_NAME;
         Stat stat = null;
         try {
@@ -594,25 +673,43 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         List<String> vetos = null;
         if (stat != null) {
             try {
+                if (log.isDebugEnabled()) {
+                    log.debug("getting all vetos by name from " + vetoNodePath + " " + stat.toString());
+                }
+
                 vetos = zkc.getChildren().forPath(vetoNodePath);
             } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                if (log.isWarnEnabled()) {
+                    log.warn("error getting vetos from zookeeper, listing vetos from cache", e.getMessage());
+                }
+
+                return vetoCache.values().stream().collect(Collectors.toList());
             }
         }
 
-        if (vetos != null)
+        if (vetos != null) {
+            if (log.isDebugEnabled()) {
+                log.debug("getting information for " + vetos.size() + " vetos.");
+            }
             for (String v : vetos) {
                 try {
                     byte[] data = zkc.getData().forPath(vetoNodePath + "/" + v);
                     VetoInformation vi = deserializeVetoInformation(data);
                     result.add(vi);
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    if (log.isWarnEnabled()) {
+                        log.warn("error getting veto '" + v + "' from zookeeper, adding veto from cache",
+                                e.getMessage());
+                    }
+                    if (vetoCache.containsKey(v))
+                        result.add(vetoCache.get(v));
                 }
             }
+        }
 
+        if (log.isDebugEnabled()) {
+            log.debug("returning information for " + result.size() + " vetos.");
+        }
         return result;
     }
 
@@ -950,10 +1047,29 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
      * @return
      */
     public String showInformation() {
-        // return getAlgorithmType() + ":
-        // "+getAlgorithmType().getDocumentation().get(DocumentationLanguage.EN)+" Cache
-        // size "+vetoCache.size();
-        return "tbd";
+        StringBuilder sb = new StringBuilder();
+        /*
+         * sb.append(getAlgorithmType())
+         * .append(": ")
+         * .append(getAlgorithmType().getDocumentation().get(DocumentationLanguage.EN));
+         */
+        sb.append(", cached vetos: ")
+                .append(vetoCache.size())
+                .append(", stored locks: ")
+                .append(vetoLocks.size())
+                .append(", stored multi locks: ")
+                .append(vetoListLocks.size())
+                .append(", stored sanitzed vetos : ")
+                .append(sanitizedvetoNames.size())
+                .append(", vetos to delete: ")
+                .append(vetoProcessingQueue.size())
+                .append(", zookeeper connection: ")
+                .append(zkc.getState())
+                .append(", zookeeper namespace: '")
+                .append(zkc.getNamespace())
+                .append("'");
+
+        return sb.toString();
     }
 
 }

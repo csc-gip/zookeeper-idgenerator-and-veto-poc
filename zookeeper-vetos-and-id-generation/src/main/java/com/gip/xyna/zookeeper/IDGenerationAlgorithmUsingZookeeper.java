@@ -22,7 +22,7 @@ public class IDGenerationAlgorithmUsingZookeeper /* implements IdGenerationAlgor
     private static int DEFAULT_INCREMENT = 50_000;
     private static String REALM_DEFAULT = "default";
 
-    Logger log = LogManager.getLogger("HelloWorld");;
+    Logger log = LogManager.getLogger(this.getClass());
     CuratorFramework zkc;
 
     ConcurrentHashMap<String, CachedAtomicLong> counters = new ConcurrentHashMap<>();

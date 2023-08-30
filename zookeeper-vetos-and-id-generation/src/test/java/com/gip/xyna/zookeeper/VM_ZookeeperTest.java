@@ -2,6 +2,7 @@ package com.gip.xyna.zookeeper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -27,6 +28,26 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         VetoAllocationResult r = vm.allocateVetos(oi1, Arrays.asList("Veto 1"), 0);
 
         assertTrue(r.isAllocated());
+    }
+
+    @Test
+    public void allocateVetoWithSpecialChars() {
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        vm.init(server.getConnectString());
+
+        OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
+        VetoAllocationResult r1 = vm.allocateVetos(oi1, Arrays.asList("Veto /"), 0);
+        VetoAllocationResult r2 = vm.allocateVetos(oi1, Arrays.asList("Veto \ud800"), 0);
+        VetoAllocationResult r3 = vm.allocateVetos(oi1, Arrays.asList("Veto \u00F6\u00E4\u00DF :-D/\ud83d\ude00 -_.#+*,§$!?%&()[]{}"), 0);
+
+        assertTrue(r1.isAllocated());
+        assertTrue(r2.isAllocated());
+        assertTrue(r3.isAllocated());
+
+        assertNull(r2.getExistingVeto());
+
+        assertEquals(3, vm.listVetos().size());
     }
 
     @Test
@@ -142,6 +163,24 @@ public class VM_ZookeeperTest extends BaseClassForTests {
     }
 
     @Test
+    public void freeVetoWithSpecialChars() {
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        vm.init(server.getConnectString());
+
+        OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
+        VetoAllocationResult r = vm.allocateVetos(oi1, Arrays.asList("Veto /"), 0);
+
+        assertTrue(r.isAllocated());
+
+        assertTrue(vm.freeVetos(oi1));
+
+        assertTrue(vm.listVetos().isEmpty());
+
+        assertFalse(vm.freeVetos(oi1));
+    }
+
+    @Test
     public void freeVetos() {
         VM_Zookeeper vm = new VM_Zookeeper();
 
@@ -178,6 +217,24 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         OrderInformation oi2 = new OrderInformation(2L, 2L, "Type 2");
         assertFalse(vm.freeVetosForced(oi2.getOrderId()));
+    }
+
+    @Test
+    public void freeVetoForcedWithSpecialChars() {
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        vm.init(server.getConnectString());
+
+        OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
+        VetoAllocationResult r = vm.allocateVetos(oi1, Arrays.asList("Veto /"), 0);
+
+        assertTrue(r.isAllocated());
+
+        assertTrue(vm.freeVetosForced(oi1.getOrderId()));
+
+        assertTrue(vm.listVetos().isEmpty());
+
+        assertFalse(vm.freeVetosForced(oi1.getOrderId()));
     }
 
     @Test
@@ -445,5 +502,31 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         System.out.println("Time per allocation [ms]: " + allocationTime);
 
         assertTrue(allocationTime < 50L, () -> "Allocationtime " + allocationTime + " < 50ms");
+    }
+
+    @Test
+    public void exhaustInternalStorage() {
+
+        final int STORAGE_SIZE = 10_000;
+
+        final int numVetos = STORAGE_SIZE + 1_000;
+
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        vm.init(server.getConnectString());
+
+        List<OrderInformation> oi = LongStream.range(0, numVetos)
+                .mapToObj(i -> new OrderInformation(i, i, UUID.randomUUID().toString())).collect(Collectors.toList());
+        List<List<String>> vetos = LongStream.range(0, numVetos)
+                .mapToObj(i -> Arrays.asList(UUID.randomUUID().toString() + "öäß :-D/\ud83d\ude00")).collect(Collectors.toList());
+
+        for (int i = 0; i < numVetos; ++i) {
+            VetoAllocationResult r = vm.allocateVetos(oi.get(i), vetos.get(i), 0);
+            assertTrue(r.isAllocated());
+        }
+
+        assertEquals(numVetos, vm.listVetos().size());
+
+        vm.shutdown();
     }
 }

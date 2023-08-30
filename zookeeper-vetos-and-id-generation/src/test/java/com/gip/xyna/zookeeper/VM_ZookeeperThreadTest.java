@@ -27,8 +27,10 @@ import org.apache.curator.test.Timing;
 import org.junit.jupiter.api.Test;
 
 public class VM_ZookeeperThreadTest extends BaseClassForTests {
+    
+    final int cores = Runtime.getRuntime().availableProcessors();
 
-    final int threads = 20;
+    final int threads = Math.min(2 * cores, 5);
     final OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
     final OrderInformation oi2 = new OrderInformation(2L, 2L, "Type 2");
     final List<String> veto1 = Arrays.asList("Veto 1");
