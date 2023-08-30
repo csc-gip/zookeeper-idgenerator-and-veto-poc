@@ -39,7 +39,7 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
         VetoAllocationResult r1 = vm.allocateVetos(oi1, Arrays.asList("Veto /"), 0);
         VetoAllocationResult r2 = vm.allocateVetos(oi1, Arrays.asList("Veto \ud800"), 0);
-        VetoAllocationResult r3 = vm.allocateVetos(oi1, Arrays.asList("Veto \u00F6\u00E4\u00DF :-D/\ud83d\ude00 -_.#+*,§$!?%&()[]{}"), 0);
+        VetoAllocationResult r3 = vm.allocateVetos(oi1, Arrays.asList("Veto äÄöÖüÜß :-D/\ud83d\ude00 -_.#+*,!?§$%&()[]{}<>|:=\"'\\"), 0);
 
         assertTrue(r1.isAllocated());
         assertTrue(r2.isAllocated());

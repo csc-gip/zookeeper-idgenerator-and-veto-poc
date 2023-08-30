@@ -5,8 +5,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.nio.charset.Charset;
-import java.security.MessageDigest;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -197,36 +195,30 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
     // https://zookeeper.apache.org/doc/r3.1.2/zookeeperProgrammers.html#ch_zkDataModel
     // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/common/PathUtils.java#L43
     // and replace every /
-    final static Pattern notAllowedInZNode = Pattern
-            .compile(".*[\u0000-\u001f\u007f-\u009F\ud800-\uf8ff\ufff0-\uffff/].*");
     ConcurrentHashMap<String, String> sanitizedvetoNames = new ConcurrentHashMap<String, String>();
 
     private String sanitizeVeto(String veto) {
 
-        boolean invalid = false;
-        final Matcher m = notAllowedInZNode.matcher(veto);
-        if (!(invalid = m.matches())) {
-            try {
-                PathUtils.validatePath(veto);
-            } catch (IllegalArgumentException e) {
-                invalid = true;
+        if (sanitizedvetoNames.containsKey(veto))
+            return sanitizedvetoNames.get(veto);
+
+        boolean invalid = veto.contains("/");
+        try {
+            PathUtils.validatePath((!veto.startsWith("/")) ? ("/" + veto) : veto);
+        } catch (IllegalArgumentException e) {
+            if (log.isDebugEnabled()) {
+                log.debug(e);
             }
+            invalid = true;
         }
 
         if (invalid) {
-            if (sanitizedvetoNames.containsKey(veto))
-                return sanitizedvetoNames.get(veto);
 
-            String sanitizedVeto = veto.replaceAll("[^-_\\s\\w\\.#+*,!?§$%&()\\[\\]{}]", "?");
+            String sanitizedVeto = veto.replaceAll("[\\W]", "?");
 
             try {
-                final MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-
-                byte[] hash = sha256.digest(veto.getBytes(Charset.forName("UTF-8")));
-                sha256.reset();
-
-                StringBuilder result = new StringBuilder(sanitizedVeto).append("_")
-                        .append(Base64.getUrlEncoder().encodeToString(hash));
+                StringBuilder result = new StringBuilder(sanitizedVeto).append("_AsBase64URL_")
+                        .append(Base64.getUrlEncoder().encodeToString(veto.getBytes("UTF-8")));
 
                 if (log.isWarnEnabled() && !sanitizedVeto.equals(veto))
                     log.warn("using sanitized Veto '" + result.toString() + "' for Veto '" + veto + "'");
