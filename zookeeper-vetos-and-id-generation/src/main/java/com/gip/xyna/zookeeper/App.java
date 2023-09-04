@@ -10,9 +10,11 @@ public class App {
 
     public static void main(String[] args) {
 
+        ZookeeperClientConnection zkc = ZookeeperClientConnection.getInstance();
+
         IDGenerationAlgorithmUsingZookeeper idgeneration = new IDGenerationAlgorithmUsingZookeeper();
 
-        idgeneration.init();
+        idgeneration.init(zkc.getCuratorFramework());
 
         for (int i = 0; i < 2 * DEFAULT_INCREMENT; ++i) {
             System.out.println("Counter 1 value after increment: " + idgeneration.getUniqueId(DEFAULT_REALM));
@@ -23,7 +25,7 @@ public class App {
         idgeneration.shutdown();
 
         VM_Zookeeper vm = new VM_Zookeeper();
-        vm.init();
+        vm.init(zkc.getCuratorFramework());
 
         OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
         OrderInformation oi2 = new OrderInformation(2L, 1L, "Type 2");
@@ -50,5 +52,7 @@ public class App {
         vm.freeVetosForced(2);
 
         vm.shutdown();
+
+        zkc.close();
     }
 }

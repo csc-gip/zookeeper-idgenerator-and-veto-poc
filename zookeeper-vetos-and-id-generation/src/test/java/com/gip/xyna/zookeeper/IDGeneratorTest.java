@@ -42,6 +42,32 @@ public class IDGeneratorTest extends BaseClassForTests {
     }
 
     @Test
+    public void testInitWithXynaConnectionAndCluster() throws Exception {
+
+        IDGenerationAlgorithmUsingZookeeper idgen = new IDGenerationAlgorithmUsingZookeeper();
+
+        TestingCluster cluster = null;
+        try {
+            cluster = createAndStartCluster(5);
+            cluster.start();
+        } catch (Exception e) {
+
+            e.printStackTrace();
+        }
+
+        assertNotNull(cluster);
+        final String connecString = cluster.getConnectString();
+
+        ZookeeperClientConnection.setConnectString(connecString);
+        ZookeeperClientConnection zkc = ZookeeperClientConnection.getInstance();
+
+        idgen.init(zkc.getCuratorFramework());
+
+        assertEquals(10_001L, idgen.getUniqueId("default"));
+        assertEquals(1L, idgen.getUniqueId("Test Realm"));
+    }
+
+    @Test
     public void testReInit() throws Exception {
 
         IDGenerationAlgorithmUsingZookeeper idgen = new IDGenerationAlgorithmUsingZookeeper();

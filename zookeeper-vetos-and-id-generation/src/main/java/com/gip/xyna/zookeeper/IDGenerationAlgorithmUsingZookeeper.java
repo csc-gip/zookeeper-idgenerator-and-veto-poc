@@ -48,12 +48,27 @@ public class IDGenerationAlgorithmUsingZookeeper /* implements IdGenerationAlgor
         init(ZK_CONNECTION_STRING);
     }
 
+    void init(CuratorFramework client) {
+
+        if (zkc != null)
+            try {
+                zkc.close();
+            } catch (UnsupportedOperationException e) {
+
+            }
+
+        zkc = client;
+    }
+
     /**
      * IdGenerationAlgorithm beenden
      */
     void shutdown() /* throws PersistenceLayerException */ {
         if (zkc != null)
-            zkc.close();
+            try {
+                zkc.close();
+            } catch (UnsupportedOperationException e) {
+            }
     }
 
     /**
@@ -106,7 +121,7 @@ public class IDGenerationAlgorithmUsingZookeeper /* implements IdGenerationAlgor
         }
 
         try {
-            synchronized(realmCounter) {
+            synchronized (realmCounter) {
                 var next = realmCounter.next();
                 while (!next.succeeded()) {
                     next = realmCounter.next();

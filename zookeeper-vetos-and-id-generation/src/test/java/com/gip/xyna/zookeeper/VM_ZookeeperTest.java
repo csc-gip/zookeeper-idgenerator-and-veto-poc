@@ -1,8 +1,10 @@
 package com.gip.xyna.zookeeper;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -12,11 +14,33 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.BaseClassForTests;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 public class VM_ZookeeperTest extends BaseClassForTests {
+
+    private static String XYNA_FACTORY_ZK_NAMESPACE = "/com.gip.xyna.factory.distributed";
+    private static String VETO_BY_NAME = XYNA_FACTORY_ZK_NAMESPACE + "/vetos/by-name";
+    private static String VETO_BY_ORDERID = XYNA_FACTORY_ZK_NAMESPACE + "/vetos/by-orderid";
+
+    private CuratorFramework client;
+
+    @BeforeEach
+    void setUpClient() {
+        client = CuratorFrameworkFactory.newClient(server.getConnectString(), new RetryOneTime(500));
+        client.start();
+    }
+
+    @AfterEach
+    void stop() {
+        client.close();
+    }
 
     @Test
     public void allocateVeto() {
@@ -28,6 +52,29 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         VetoAllocationResult r = vm.allocateVetos(oi1, Arrays.asList("Veto 1"), 0);
 
         assertTrue(r.isAllocated());
+
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+
+    }
+
+    @Test
+    public void allocateVetoWithXynaConnection() {
+        VM_Zookeeper vm = new VM_Zookeeper();
+
+        ZookeeperClientConnection.setConnectString(server.getConnectString());
+        ZookeeperClientConnection zkc = ZookeeperClientConnection.getInstance();
+
+        vm.init(zkc.getCuratorFramework());
+
+        OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
+        VetoAllocationResult r = vm.allocateVetos(oi1, Arrays.asList("Veto 1"), 0);
+
+        assertTrue(r.isAllocated());
+
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+
     }
 
     @Test
@@ -39,13 +86,29 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         OrderInformation oi1 = new OrderInformation(1L, 1L, "Type 1");
         VetoAllocationResult r1 = vm.allocateVetos(oi1, Arrays.asList("Veto /"), 0);
         VetoAllocationResult r2 = vm.allocateVetos(oi1, Arrays.asList("Veto \ud800"), 0);
-        VetoAllocationResult r3 = vm.allocateVetos(oi1, Arrays.asList("Veto äÄöÖüÜß :-D/\ud83d\ude00 -_.#+*,!?§$%&()[]{}<>|:=\"'\\"), 0);
+        VetoAllocationResult r3 = vm.allocateVetos(oi1,
+                Arrays.asList("Veto äÄöÖüÜß :-D/\ud83d\ude00 -_.#+*,!?§$%&()[]{}<>|:=\"'\\"), 0);
 
         assertTrue(r1.isAllocated());
-        assertTrue(r2.isAllocated());
-        assertTrue(r3.isAllocated());
+        assertDoesNotThrow(
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto??_AsBase64URL_VmV0byAv").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto??_AsBase64URL_VmV0byAv")
+                .getVersion());
 
+        assertTrue(r2.isAllocated());
         assertNull(r2.getExistingVeto());
+        assertDoesNotThrow(
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto??_AsBase64URL_VmV0byA_").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto??_AsBase64URL_VmV0byA_")
+                .getVersion());
+
+        assertTrue(r3.isAllocated());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME
+                + "/Veto???????????D????_?????????????????????????_AsBase64URL_VmV0byDDpMOEw7bDlsO8w5zDnyA6LUQv8J-YgCAtXy4jKyosIT_CpyQlJigpW117fTw-fDo9Iidc")
+                .getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1"
+                + "/Veto???????????D????_?????????????????????????_AsBase64URL_VmV0byDDpMOEw7bDlsO8w5zDnyA6LUQv8J-YgCAtXy4jKyosIT_CpyQlJigpW117fTw-fDo9Iidc")
+                .getVersion());
 
         assertEquals(3, vm.listVetos().size());
     }
@@ -61,6 +124,11 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         assertTrue(r.isAllocated());
 
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 2").getVersion());
+
         assertTrue(vm.listVetos().size() == 2);
     }
 
@@ -75,11 +143,15 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         assertTrue(r.isAllocated());
         assertTrue(vm.listVetos().size() == 1);
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
 
         r = vm.allocateVetos(oi1, Arrays.asList("Veto 2"), 0);
 
         assertTrue(r.isAllocated());
         assertTrue(vm.listVetos().size() == 2);
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 2").getVersion());
     }
 
     @Test
@@ -136,6 +208,12 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.undoAllocation(oi1, Arrays.asList("Veto 1"));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         r = vm.allocateVetos(oi1, Arrays.asList("Veto 1"), 0);
         assertTrue(r.isAllocated());
@@ -155,6 +233,12 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.freeVetos(oi1));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         assertFalse(vm.freeVetos(oi1));
 
@@ -176,6 +260,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.freeVetos(oi1));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         assertFalse(vm.freeVetos(oi1));
     }
@@ -194,6 +280,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.freeVetos(oi1));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         assertFalse(vm.freeVetos(oi1));
     }
@@ -212,6 +300,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.freeVetosForced(oi1.getOrderId()));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         assertFalse(vm.freeVetosForced(oi1.getOrderId()));
 
@@ -233,6 +323,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.freeVetosForced(oi1.getOrderId()));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         assertFalse(vm.freeVetosForced(oi1.getOrderId()));
     }
@@ -251,6 +343,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertTrue(vm.freeVetosForced(oi1.getOrderId()));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
 
         assertFalse(vm.freeVetosForced(oi1.getOrderId()));
     }
@@ -269,6 +363,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.undoAllocation(oi1, Arrays.asList("Veto 1", "Veto 2"));
 
         assertTrue(vm.listVetos().isEmpty());
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
     }
 
     @Test
@@ -285,10 +381,22 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.undoAllocation(oi1, Arrays.asList("Veto 1"));
 
         assertTrue(vm.listVetos().size() == 1);
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
 
         vm.undoAllocation(oi1, Arrays.asList("Veto 2"));
 
         assertTrue(vm.listVetos().isEmpty());
+
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 2").getVersion());
+
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_NAME).isEmpty()));
+        assertDoesNotThrow(() -> assertTrue(client.getChildren().forPath(VETO_BY_ORDERID).isEmpty()));
     }
 
     @Test
@@ -306,6 +414,9 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         r = vm.allocateVetos(oi2, Arrays.asList("Veto 1"), 0);
         assertFalse(r.isAllocated());
         assertEquals("Veto 1", r.getVetoName());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_ORDERID + "2" + "/Veto 1").getVersion());
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_ORDERID + "/2").getVersion());
     }
 
     @Test
@@ -324,7 +435,12 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertFalse(r.isAllocated());
         assertEquals("Veto 1", r.getVetoName());
         assertTrue(vm.listVetos().size() == 1);
-    }
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertThrows(NullPointerException.class,
+                () -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 2").getVersion());
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_ORDERID + "/2").getVersion());
+}
 
     @Test
     public void tryAllocateVetoToMultiple() {
@@ -342,6 +458,7 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         assertFalse(r.isAllocated());
         assertEquals("Veto 2", r.getVetoName());
         assertTrue(vm.listVetos().size() == 2);
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_ORDERID + "/2").getVersion());
     }
 
     @Test
@@ -360,6 +477,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         assertTrue(vm.listVetos().size() == 1);
 
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
     }
 
     @Test
@@ -387,7 +506,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         }
         assertTrue(r.isAllocated());
 
-        while (vm.listVetos().size() != 2);
+        while (vm.listVetos().size() != 2)
+            ;
     }
 
     @Test
@@ -401,11 +521,18 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         assertTrue(r.isAllocated());
 
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+
         r = vm.allocateVetos(oi1, Arrays.asList("Veto 2"), 0);
         assertTrue(r.isAllocated());
 
         assertTrue(vm.listVetos().size() == 2);
 
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 1").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 2").getVersion());
     }
 
     @Test
@@ -422,11 +549,15 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.undoAllocation(oi1, Arrays.asList("Veto 1"));
 
         assertTrue(vm.listVetos().size() == 1);
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1" + "/Veto 2").getVersion());
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 1").getVersion());
 
         vm.undoAllocation(oi1, Arrays.asList("Veto 2"));
 
         assertTrue(vm.listVetos().isEmpty());
-
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_NAME + "/Veto 2").getVersion());
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_ORDERID + "/1").getVersion());
     }
 
     @Test
@@ -438,6 +569,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.allocateAdministrativeVeto(new AdministrativeVeto("Test Admin Veto", "Test Doku"));
 
         assertTrue(vm.listVetos().size() == 1);
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Test Admin Veto").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/-1" + "/Test Admin Veto").getVersion());
     }
 
     @Test
@@ -455,7 +588,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         vm.setDocumentationOfAdministrativeVeto(av);
 
         assertTrue(vm.listVetos().size() == 1);
-
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_NAME + "/Test Admin Veto").getVersion());
+        assertDoesNotThrow(() -> client.checkExists().forPath(VETO_BY_ORDERID + "/-1" + "/Test Admin Veto").getVersion());
     }
 
     @Test
@@ -473,6 +607,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
 
         assertTrue(vm.listVetos().isEmpty());
 
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_NAME + "/Test Admin Veto").getVersion());
+        assertThrows(NullPointerException.class,() -> client.checkExists().forPath(VETO_BY_ORDERID + "/-1").getVersion());
     }
 
     @Test
@@ -518,7 +654,8 @@ public class VM_ZookeeperTest extends BaseClassForTests {
         List<OrderInformation> oi = LongStream.range(0, numVetos)
                 .mapToObj(i -> new OrderInformation(i, i, UUID.randomUUID().toString())).collect(Collectors.toList());
         List<List<String>> vetos = LongStream.range(0, numVetos)
-                .mapToObj(i -> Arrays.asList(UUID.randomUUID().toString() + "öäß :-D/\ud83d\ude00")).collect(Collectors.toList());
+                .mapToObj(i -> Arrays.asList(UUID.randomUUID().toString() + "öäß :-D/\ud83d\ude00"))
+                .collect(Collectors.toList());
 
         for (int i = 0; i < numVetos; ++i) {
             VetoAllocationResult r = vm.allocateVetos(oi.get(i), vetos.get(i), 0);

@@ -21,7 +21,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.apache.curator.framework.CuratorFramework;
@@ -55,23 +54,34 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
     private static final String VETO_BY_NAME = VETO_PATH + "/by-name";
     private static final String VETO_BY_ORDERID = VETO_PATH + "/by-orderid";
 
-    private final AtomicBoolean isConnected = new AtomicBoolean(false);
-
     private static int PERMANENT_OBJECTS_CACHE_SIZE = 10_000;
 
     Logger log = LogManager.getLogger(this.getClass());
 
     private CuratorFramework zk_client, zkc;
+    {
+        Configurator.setAllLevels(LogManager.getRootLogger().getName(), Level.TRACE);
+
+    }
 
     void init() {
         init(ZK_CONNECTION_STRING);
     }
 
     void init(String connectString) {
-        Configurator.setAllLevels(LogManager.getRootLogger().getName(), Level.TRACE);
-
         zk_client = CuratorFrameworkFactory.newClient(connectString,
                 new ExponentialBackoffRetry(1000, 3));
+
+        zk_client.getConnectionStateListenable().addListener(new ConnectionStateListener() {
+
+            @Override
+            public void stateChanged(CuratorFramework client, ConnectionState newState) {
+                if (log.isDebugEnabled())
+                    log.debug("New connection state for Zookeeper client@"
+                            + zkc.getZookeeperClient().getCurrentConnectionString() + ": " + newState.toString());
+            }
+
+        });
 
         if (log.isInfoEnabled()) {
             log.info("Connecting to Zookeeper: " + connectString);
@@ -83,7 +93,10 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
     void init(CuratorFramework client) {
 
         if (zk_client != null)
-            zk_client.close();
+            try {
+                zk_client.close();
+            } catch (UnsupportedOperationException e) {
+            }
 
         zk_client = client;
 
@@ -101,29 +114,25 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
             vetoProcessor.awaitTermination(10, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             vetoProcessor.shutdownNow();
-            log.error("Veto Processor did not stop in time. Vetos to process: "
-                    + vetoProcessingQueue.stream().map(v -> v.toString() + ", ").reduce("", String::concat));
+            try {
+                vetoProcessor.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e1) {
+                log.error("Veto Processor did not stop in time. Vetos to process: "
+                        + vetoProcessingQueue.stream().map(v -> v.toString() + ", ").reduce("", String::concat));
+            }
         }
 
         if (zk_client != null) {
-            zk_client.close();
+            try {
+                zk_client.close();
+            } catch (UnsupportedOperationException e) {
+
+            }
         }
 
     }
 
     private void start() {
-        zk_client.getConnectionStateListenable().addListener(new ConnectionStateListener() {
-
-            @Override
-            public void stateChanged(CuratorFramework client, ConnectionState newState) {
-                isConnected.set(newState.isConnected());
-                if (log.isDebugEnabled())
-                    log.debug("New connection state for Zookeeper client@"
-                            + zkc.getZookeeperClient().getCurrentConnectionString() + ": " + newState.toString());
-            }
-
-        });
-
         if (zk_client.getState().equals(CuratorFrameworkState.LATENT))
             zk_client.start();
 
@@ -185,9 +194,9 @@ public class VM_Zookeeper /* implements VetoManagementInterface */ {
         }
 
         if (log.isDebugEnabled())
-            log.debug("is connected: " + isConnected.get());
+            log.debug("is connected: " + zkc.getZookeeperClient().isConnected());
 
-        return isConnected.get();
+        return zkc.getZookeeperClient().isConnected();
     }
 
     // https://zookeeper.apache.org/doc/r3.1.2/zookeeperProgrammers.html#ch_zkDataModel
